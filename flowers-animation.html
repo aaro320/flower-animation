@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Magical Heart Garden with Leaves</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #050510; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+<canvas id="gardenCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gardenCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const random = (min, max) => Math.random() * (max - min) + min;
+
+let startTime = Date.now();
+let heartTriggered = false;
+let flowers = [];
+let butterflies = [];
+
+class Butterfly {
+    constructor() { this.reset(); }
+    reset() {
+        this.x = random(0, canvas.width);
+        this.y = random(0, canvas.height);
+        this.vx = random(-1.2, 1.2);
+        this.vy = random(-0.8, 0.8);
+        this.size = random(3, 5);
+        this.wingAngle = 0;
+        this.color = `hsl(${random(0, 25)}, 100%, 70%)`;
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy;
+        this.wingAngle += 0.15;
+        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+    }
+    draw() {
+        let ws = Math.abs(Math.sin(this.wingAngle)) * this.size;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.ellipse(-ws, 0, ws, this.size, 0, 0, Math.PI * 2);
+        ctx.ellipse(ws, 0, ws, this.size, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Flower {
+    constructor(isHeartPart = false, targetX = 0, targetY = 0) {
+        this.isHeartPart = isHeartPart;
+        this.targetX = targetX;
+        this.targetY = targetY;
+        this.spawn();
+    }
+
+    spawn() {
+        this.x = this.isHeartPart ? this.targetX : random(50, canvas.width - 50);
+        this.maxH = this.isHeartPart ? (canvas.height - this.targetY) : random(150, canvas.height * 0.6);
+        this.curH = 0;
+        this.petalR = 0;
+        this.maxPetalR = random(12, 25);
+        this.bloomed = false;
+        this.hue = this.isHeartPart ? random(345, 360) : random(300, 360);
+        this.opacity = 0;
+        this.state = 'GROWING';
+        this.stayTimer = 0;
+        this.maxStay = this.isHeartPart ? 120 : random(200, 400); 
+    }
+
+    update() {
+        if (this.state === 'GROWING') {
+            if (this.opacity < 1) this.opacity += 0.03;
+            this.curH += 2;
+            if (this.curH >= this.maxH) this.state = 'BLOOMING';
+        } else if (this.state === 'BLOOMING') {
+            this.bloomed = true;
+            if (this.petalR < this.maxPetalR) {
+                this.petalR += 0.5;
+            } else {
+                this.stayTimer++;
+                if (this.stayTimer > this.maxStay) this.state = 'FADING';
+            }
+        } else if (this.state === 'FADING') {
+            this.opacity -= 0.02;
+            if (this.opacity <= 0) {
+                if (this.isHeartPart) this.markedForDeletion = true;
+                else this.spawn();
+            }
+        }
+    }
+
+    draw() {
+        const topY = canvas.height - this.curH;
+        ctx.globalAlpha = this.opacity;
+        
+        // Draw Stem
+        ctx.strokeStyle = `rgba(34, 139, 34, ${this.opacity})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(this.x, canvas.height);
+        ctx.quadraticCurveTo(this.x + 10, canvas.height - this.curH/2, this.x, topY);
+        ctx.stroke();
+
+        // Draw Leaves
+        if (this.curH > 60) {
+            this.drawLeaf(this.x + 2, canvas.height - 40, -0.5); // Left leaf
+            this.drawLeaf(this.x - 2, canvas.height - 70, 0.5);  // Right leaf
+        }
+
+        if (this.bloomed) {
+            ctx.shadowBlur = 15 * this.opacity;
+            ctx.shadowColor = `hsl(${this.hue}, 100%, 60%)`;
+            for (let i = 0; i < 6; i++) {
+                const angle = (i * 60) * Math.PI / 180;
+                ctx.fillStyle = `hsla(${this.hue}, 80%, 70%, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x + Math.cos(angle)*(this.petalR*0.7), topY + Math.sin(angle)*(this.petalR*0.7), this.petalR/1.6, 0, Math.PI*2);
+                ctx.fill();
+            }
+            ctx.fillStyle = `rgba(255, 239, 150, ${this.opacity})`;
+            ctx.beginPath();
+            ctx.arc(this.x, topY, this.petalR/3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+    }
+
+    drawLeaf(x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = `rgba(34, 139, 34, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 10, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+// Initial Setup
+for(let i=0; i<8; i++) flowers.push(new Flower());
+for(let i=0; i<6; i++) butterflies.push(new Butterfly());
+
+function getHeartPoint(t) {
+    const r = Math.min(canvas.width, canvas.height) / 50; 
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+    return { x: x * r, y: -y * r };
+}
+
+function spawnHeart() {
+    heartTriggered = true;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height * 0.45;
+    for (let t = 0; t < Math.PI * 2; t += 0.35) {
+        const pos = getHeartPoint(t);
+        flowers.push(new Flower(true, centerX + pos.x, centerY + pos.y));
+    }
+}
+
+function drawGrass() {
+    ctx.strokeStyle = '#0a2e0a';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < canvas.width; i += 12) {
+        ctx.beginPath();
+        ctx.moveTo(i, canvas.height);
+        ctx.lineTo(i + Math.sin(Date.now()/500 + i)*3, canvas.height - 35);
+        ctx.stroke();
+    }
+}
+
+function animate() {
+    ctx.fillStyle = 'rgba(5, 5, 20, 0.4)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawGrass();
+
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (elapsed > 15 && !heartTriggered) spawnHeart();
+    if (elapsed > 25) {
+        startTime = Date.now();
+        heartTriggered = false;
+    }
+
+    flowers = flowers.filter(f => !f.markedForDeletion);
+    flowers.forEach(f => { f.update(); f.draw(); });
+    butterflies.forEach(b => { b.update(); b.draw(); });
+
+    requestAnimationFrame(animate);
+}
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+
+animate();
+</script>
+</body>
+</html>
