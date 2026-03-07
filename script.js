@@ -21,42 +21,45 @@ const message = {
     fontSize: 0
 };
 
-overlay.addEventListener('click', () => {
-    overlay.style.opacity = '0';
-    setTimeout(() => overlay.style.display = 'none', 1000);
-    music.play().catch(e => console.log("Music play blocked"));
-    gardenStarted = true;
-    startTime = Date.now();
-});
+// --- CORE FUNCTIONS ---
 
 function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    message.fontSize = Math.min(canvas.width / 10, 60);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.scale(dpr, dpr);
+    
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+
+    message.fontSize = Math.min(window.innerWidth / 12, 70);
     initStars(); 
 }
 
 const random = (min, max) => Math.random() * (max - min) + min;
 
-// --- CLASSES (Star, Cloud, ShootingStar, Particle, Butterfly, Flower) ---
+overlay.addEventListener('click', () => {
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.style.display = 'none', 1500);
+    music.play().catch(() => console.log("Audio needs user interaction first"));
+    gardenStarted = true;
+    startTime = Date.now();
+});
+
+// --- CLASSES ---
 
 class Star {
     constructor() {
-        this.x = random(0, canvas.width);
-        this.y = random(0, canvas.height);
+        this.x = random(0, window.innerWidth);
+        this.y = random(0, window.innerHeight);
         this.size = random(0.2, 1.2);
         this.blinkSpeed = random(0.01, 0.03);
         this.alpha = random(0.1, 1);
         this.growing = true;
     }
     update() {
-        if (this.growing) {
-            this.alpha += this.blinkSpeed;
-            if (this.alpha >= 1) this.growing = false;
-        } else {
-            this.alpha -= this.blinkSpeed;
-            if (this.alpha <= 0.1) this.growing = true;
-        }
+        if (this.growing) { this.alpha += this.blinkSpeed; if (this.alpha >= 1) this.growing = false; }
+        else { this.alpha -= this.blinkSpeed; if (this.alpha <= 0.1) this.growing = true; }
     }
     draw() {
         ctx.save();
@@ -69,52 +72,13 @@ class Star {
     }
 }
 
-class Cloud {
-    constructor() {
-        this.reset();
-        this.x = random(0, canvas.width);
-    }
-    reset() {
-        this.x = -500;
-        this.y = random(0, canvas.height * 0.7);
-        this.speed = random(0.2, 0.4);
-        this.opacity = random(0.02, 0.04);
-        this.puffs = [];
-        for(let i=0; i<10; i++) {
-            this.puffs.push({
-                ox: random(-150, 150),
-                oy: random(-50, 50),
-                r: random(100, 200)
-            });
-        }
-    }
-    update() {
-        this.x += this.speed;
-        if (this.x > canvas.width + 500) this.reset();
-    }
-    draw() {
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen';
-        this.puffs.forEach(p => {
-            let grad = ctx.createRadialGradient(this.x + p.ox, this.y + p.oy, 0, this.x + p.ox, this.y + p.oy, p.r);
-            grad.addColorStop(0, `rgba(255, 182, 193, ${this.opacity})`);
-            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(this.x + p.ox, this.y + p.oy, p.r, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        ctx.restore();
-    }
-}
-
 class ShootingStar {
     constructor() { this.reset(); }
     reset() {
-        this.x = random(canvas.width * 0.2, canvas.width);
-        this.y = random(0, canvas.height * 0.4);
-        this.len = random(50, 150);
-        this.speed = random(10, 20);
+        this.x = random(window.innerWidth * 0.3, window.innerWidth);
+        this.y = random(0, window.innerHeight * 0.4);
+        this.len = random(80, 200);
+        this.speed = random(10, 25);
         this.opacity = 1;
         this.active = false;
     }
@@ -123,7 +87,7 @@ class ShootingStar {
         if (this.active) {
             this.x -= this.speed;
             this.y += this.speed * 0.5;
-            this.opacity -= 0.02;
+            this.opacity -= 0.015;
             if (this.opacity <= 0) this.reset();
         }
     }
@@ -140,50 +104,22 @@ class ShootingStar {
     }
 }
 
-class Particle {
-    constructor(x, y, hue) {
-        this.x = x; this.y = y;
-        this.vx = random(-0.5, 0.5);
-        this.vy = random(-0.2, -1);
-        this.size = random(0.5, 2);
-        this.life = 1;
-        this.decay = random(0.005, 0.015);
-        this.hue = hue;
-    }
-    update() {
-        this.x += this.vx + Math.sin(Date.now() * 0.001) * 0.5;
-        this.y += this.vy;
-        this.life -= this.decay;
-    }
-    draw() {
-        ctx.save();
-        ctx.globalAlpha = this.life;
-        ctx.fillStyle = `hsla(${this.hue}, 100%, 80%, ${this.life})`;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = `hsl(${this.hue}, 100%, 50%)`;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-}
-
 class Butterfly {
     constructor() { this.reset(); }
     reset() {
-        this.x = random(0, canvas.width);
-        this.y = random(0, canvas.height);
-        this.vx = random(-1.2, 1.2);
-        this.vy = random(-0.8, 0.8);
-        this.size = random(2, 4);
+        this.x = random(0, window.innerWidth);
+        this.y = random(0, window.innerHeight);
+        this.vx = random(-1.5, 1.5);
+        this.vy = random(-1, 1);
+        this.size = random(3, 5);
         this.wingAngle = 0;
         this.hue = random(200, 320); 
     }
     update() {
         this.x += this.vx; this.y += this.vy;
         this.wingAngle += 0.2;
-        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
-        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+        if (this.x < 0 || this.x > window.innerWidth) this.vx *= -1;
+        if (this.y < 0 || this.y > window.innerHeight) this.vy *= -1;
     }
     draw() {
         let ws = Math.abs(Math.sin(this.wingAngle)) * (this.size * 1.5);
@@ -191,7 +127,7 @@ class Butterfly {
         ctx.translate(this.x, this.y);
         ctx.rotate(Math.atan2(this.vy, this.vx));
         ctx.fillStyle = `hsl(${this.hue}, 100%, 75%)`;
-        ctx.shadowBlur = 12; ctx.shadowColor = `hsl(${this.hue}, 100%, 60%)`;
+        ctx.shadowBlur = 15; ctx.shadowColor = `hsl(${this.hue}, 100%, 60%)`;
         ctx.beginPath();
         ctx.ellipse(0, -ws/2, ws, this.size, 0.5, 0, Math.PI * 2);
         ctx.ellipse(0, ws/2, ws, this.size, -0.5, 0, Math.PI * 2);
@@ -208,33 +144,32 @@ class Flower {
         this.spawn();
     }
     spawn() {
-        this.x = this.isHeartPart ? this.targetX : random(50, canvas.width - 50);
-        this.maxH = this.isHeartPart ? (canvas.height - this.targetY) : random(150, canvas.height * 0.7);
+        this.x = this.isHeartPart ? this.targetX : random(100, window.innerWidth - 100);
+        this.maxH = this.isHeartPart ? (window.innerHeight - this.targetY) : random(200, window.innerHeight * 0.6);
         this.curH = 0;
-        this.segments = Math.floor(random(6, 9));
+        this.segments = Math.floor(random(6, 10));
         this.petalR = 0;
-        this.maxPetalR = random(10, 22);
+        this.maxPetalR = random(12, 25);
         this.bloomed = false;
         this.hue = this.isHeartPart ? random(340, 360) : random(280, 340);
         this.opacity = 0;
         this.state = 'GROWING';
         this.stayTimer = 0;
-        this.maxStay = this.isHeartPart ? 600 : random(400, 800);
+        this.maxStay = this.isHeartPart ? 1000 : random(500, 900);
         this.swayOffset = random(0, Math.PI * 2);
-        this.segmentKinks = Array.from({length: this.segments}, () => random(-2, 2));
+        this.segmentKinks = Array.from({length: this.segments}, () => random(-3, 3));
     }
     update() {
-        this.sway = Math.sin(Date.now() * 0.001 + this.swayOffset) * (this.curH * 0.05);
+        this.sway = Math.sin(Date.now() * 0.001 + this.swayOffset) * (this.curH * 0.04);
         if (this.state === 'GROWING') {
             if (this.opacity < 1) this.opacity += 0.02;
-            this.curH += 1.2;
+            this.curH += 1.5;
             if (this.curH >= this.maxH) this.state = 'BLOOMING';
         } else if (this.state === 'BLOOMING') {
             this.bloomed = true;
-            if (this.petalR < this.maxPetalR) this.petalR += 0.4;
+            if (this.petalR < this.maxPetalR) this.petalR += 0.5;
             else {
                 this.stayTimer++;
-                if (Math.random() < 0.05) particles.push(new Particle(this.lastTopX, this.lastTopY, 50));
                 if (this.stayTimer > this.maxStay) this.state = 'FADING';
             }
         } else if (this.state === 'FADING') {
@@ -249,39 +184,18 @@ class Flower {
         ctx.save();
         ctx.globalAlpha = this.opacity;
         let prevX = this.x;
-        let prevY = canvas.height;
+        let prevY = window.innerHeight;
         for (let i = 1; i <= this.segments; i++) {
             const ratio = i / this.segments;
-            const currentY = canvas.height - (this.curH * ratio);
+            const currentY = window.innerHeight - (this.curH * ratio);
             const currentX = this.x + (this.sway * Math.pow(ratio, 1.5)) + this.segmentKinks[i-1];
-            const thickness = Math.max(1, 5 * (1 - ratio * 0.7));
-            ctx.strokeStyle = '#2d5a27';
-            ctx.lineWidth = thickness;
+            ctx.strokeStyle = '#1a3317';
+            ctx.lineWidth = Math.max(1, 4 * (1 - ratio * 0.6));
             ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(prevX, prevY);
-            ctx.lineTo(currentX, currentY);
-            ctx.stroke();
-            if (i === 2 && this.curH > 60) this.drawLeaf(currentX, currentY, -0.8 + (this.sway*0.02), thickness);
-            if (i === 4 && this.curH > 100) this.drawLeaf(currentX, currentY, 0.6 + (this.sway*0.02), thickness);
-            prevX = currentX;
-            prevY = currentY;
+            ctx.beginPath(); ctx.moveTo(prevX, prevY); ctx.lineTo(currentX, currentY); ctx.stroke();
+            prevX = currentX; prevY = currentY;
         }
-        this.lastTopX = prevX;
-        this.lastTopY = prevY;
         if (this.bloomed) this.drawFlowerHead(prevX, prevY);
-        ctx.restore();
-    }
-    drawLeaf(x, y, angle, stemWidth) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        const leafGrad = ctx.createLinearGradient(0, 0, 20, 0);
-        leafGrad.addColorStop(0, '#1e4d1a'); leafGrad.addColorStop(1, '#3a7d34');
-        ctx.fillStyle = leafGrad;
-        ctx.beginPath();
-        ctx.moveTo(0, 0); ctx.quadraticCurveTo(10, -8, 22, 0);
-        ctx.quadraticCurveTo(10, 8, 0, 0); ctx.fill();
         ctx.restore();
     }
     drawFlowerHead(x, y) {
@@ -289,48 +203,33 @@ class Flower {
         ctx.shadowColor = `hsl(${this.hue}, 100%, 50%)`;
         for (let i = 0; i < 6; i++) {
             const angle = (i * 60 + (this.sway * 2)) * Math.PI / 180;
-            ctx.fillStyle = `hsla(${this.hue}, 80%, 65%, ${this.opacity})`;
+            ctx.fillStyle = `hsla(${this.hue}, 80%, 70%, ${this.opacity})`;
             ctx.beginPath();
             ctx.ellipse(x + Math.cos(angle)*(this.petalR*0.6), y + Math.sin(angle)*(this.petalR*0.6), this.petalR, this.petalR/1.8, angle, 0, Math.PI * 2);
             ctx.fill();
         }
         ctx.fillStyle = "#ffd700";
         ctx.beginPath(); ctx.arc(x, y, this.petalR/3, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
     }
 }
 
-// --- HELPERS ---
+// --- INITIALIZATION ---
 
 function initStars() {
     stars = [];
-    for (let i = 0; i < 150; i++) stars.push(new Star());
+    for (let i = 0; i < 200; i++) stars.push(new Star());
 }
 
 function spawnHeart() {
     heartTriggered = true;
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height * 0.55;
-    for (let t = 0; t < Math.PI * 2; t += 0.45) {
-        const pos = {
-            x: 16 * Math.pow(Math.sin(t), 3),
-            y: -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t))
-        };
-        const r = Math.min(canvas.width, canvas.height) / 55;
-        flowers.push(new Flower(true, centerX + pos.x * r, centerY + pos.y * r));
-    }
-}
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight * 0.52;
+    const scale = Math.min(window.innerWidth, window.innerHeight) / 50;
 
-function drawGrass() {
-    for (let i = 0; i < canvas.width; i += 12) {
-        const h = 35 + Math.sin(i * 0.1) * 10;
-        const sway = Math.sin(Date.now() * 0.002 + i) * 5;
-        ctx.strokeStyle = '#081a08';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(i, canvas.height);
-        ctx.quadraticCurveTo(i + sway, canvas.height - h/2, i + sway, canvas.height - h);
-        ctx.stroke();
+    for (let t = 0; t < Math.PI * 2; t += 0.35) {
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+        flowers.push(new Flower(true, centerX + x * scale, centerY + y * scale));
     }
 }
 
@@ -339,55 +238,45 @@ function drawMessage() {
     ctx.save();
     ctx.font = `${message.fontSize}px "Dancing Script", cursive`;
     ctx.textAlign = "center";
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "rgba(255, 105, 180, 0.8)";
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = "rgba(255, 105, 180, 0.6)";
     ctx.fillStyle = `rgba(255, 255, 255, ${message.opacity})`;
-    const topPadding = canvas.height * 0.18;
-    ctx.fillText(message.line1, canvas.width / 2, topPadding);
-    ctx.fillText(message.line2, canvas.width / 2, topPadding + (message.fontSize * 1.1));
+    ctx.fillText(message.line1, window.innerWidth / 2, window.innerHeight * 0.15);
+    ctx.fillText(message.line2, window.innerWidth / 2, window.innerHeight * 0.15 + (message.fontSize * 1.2));
     ctx.restore();
 
     const elapsed = (Date.now() - startTime) / 1000;
-    if (message.opacity < 1 && elapsed < 15) message.opacity += 0.01;
-    if (elapsed > 20 && message.opacity > 0) message.opacity -= 0.01;
+    if (message.opacity < 1 && elapsed < 15) message.opacity += 0.008;
+    if (elapsed > 25 && message.opacity > 0) message.opacity -= 0.008;
 }
 
-// --- INITIALIZE & ANIMATE ---
+// --- ANIMATION LOOP ---
 
-initStars();
-for(let i=0; i<10; i++) flowers.push(new Flower());
-for(let i=0; i<12; i++) butterflies.push(new Butterfly());
-for(let i=0; i<4; i++) clouds.push(new Cloud());
-for(let i=0; i<5; i++) shootingStars.push(new ShootingStar());
+for(let i=0; i<15; i++) flowers.push(new Flower());
+for(let i=0; i<15; i++) butterflies.push(new Butterfly());
+for(let i=0; i<6; i++) shootingStars.push(new ShootingStar());
 
 function animate() {
-    ctx.fillStyle = 'rgba(2, 2, 8, 0.3)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(2, 2, 8, 0.4)';
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
     
     stars.forEach(s => { s.update(); s.draw(); });
     butterflies.forEach(b => { b.update(); b.draw(); });
 
     if (gardenStarted) {
         shootingStars.forEach(s => { s.update(); s.draw(); });
-        clouds.forEach(c => { c.update(); c.draw(); });
-        drawGrass();
-
         const elapsed = (Date.now() - startTime) / 1000;
-        if (elapsed > 5 && !heartTriggered) { spawnHeart(); message.visible = true; }
-        if (elapsed > 35) { startTime = Date.now(); heartTriggered = false; message.visible = false; message.opacity = 0; }
+        
+        if (elapsed > 4 && !heartTriggered) { spawnHeart(); message.visible = true; }
+        if (elapsed > 45) { startTime = Date.now(); heartTriggered = false; message.visible = false; message.opacity = 0; }
         
         flowers = flowers.filter(f => !f.markedForDeletion);
         flowers.forEach(f => { f.update(); f.draw(); });
-        
-        drawMessage(); 
-        
-        particles = particles.filter(p => p.life > 0);
-        particles.forEach(p => { p.update(); p.draw(); });
+        drawMessage();
     }
-    
     requestAnimationFrame(animate);
 }
 
-resize();
 window.addEventListener('resize', resize);
+resize();
 animate();
